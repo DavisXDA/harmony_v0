@@ -33,19 +33,23 @@ Minor keys and modal keys are unsupported. A key string other than exactly `C`, 
 
 ### 2.2 Accidentals and pitch spelling
 
-The supported written pitch classes are `C`, `D`, `E`, `F`, `G`, `A`, `B`, `F#`, and `Bb`. `#` means one semitone above the natural letter and `b` means one semitone below it. Double accidentals and natural signs are unsupported.
+The global canonical pitch grammar contains exactly the written pitch classes `C`, `D`, `E`, `F`, `G`, `A`, `B`, `F#`, and `Bb`. `#` means one semitone above the natural letter and `b` means one semitone below it. Double accidentals and natural signs are unsupported.
 
-Spelling is key-sensitive:
+After global syntax parsing, pitch-class support is key-sensitive and uses these exact sets:
 
-- `C` major accepts natural pitch classes only;
-- `G` major accepts natural pitch classes plus `F#`, and rejects `Gb` and `F` as substitutes for F# where F# is required;
-- `F` major accepts natural pitch classes plus `Bb`, and rejects `A#` and `B` as substitutes for Bb where Bb is required.
+| Selected key | Accepted pitch classes |
+|---|---|
+| `C` major | `C`, `D`, `E`, `F`, `G`, `A`, `B` |
+| `G` major | `G`, `A`, `B`, `C`, `D`, `E`, `F#` |
+| `F` major | `F`, `G`, `A`, `Bb`, `C`, `D`, `E` |
+
+Consequently `F4` in G major, `B4` in F major, and `F#4` or `Bb4` in C major are globally canonical but fail the selected-key subset with `UNSUPPORTED_PITCH` / `UNSUPPORTED_MUSICAL_ELEMENT`. `F#4` in G major and `Bb4` in F major are supported. `Gb4` and `A#4` do not match the global canonical grammar and fail with `INVALID_PITCH_FORMAT` / `INVALID_REQUEST` rather than being normalized enharmonically.
 
 Enharmonic spellings not listed above are unsupported even when they map to the same semitone.
 
 ### 2.3 Canonical notation
 
-- Pitch: scientific pitch notation matching `^(C|D|E|F|G|A|B|F#|Bb)[0-9]+$`, then restricted by the selected key and voice range. Middle C is `C4`.
+- Pitch: scientific pitch notation matching `^(C|D|E|F|G|A|B|F#|Bb)[0-9]+$`, then restricted by the exact selected-key set in Section 2.2 and the applicable voice range. Middle C is `C4`.
 - Key: exactly `C`, `G`, or `F`.
 - Major chord: root only, for example `C`, `F`, `G`, `Bb`.
 - Minor chord: root followed immediately by lowercase `m`, for example `Am`, `Dm`, `Em`.
@@ -88,11 +92,12 @@ The eight-event limit bounds initial search complexity and is part of `satb-init
 
 #### `SUPPORTED_PITCH_NOTATION` — HARD
 
-- Condition: every pitch follows Sections 2.2–2.3, uses the selected key's spelling, and parses to one pitch number.
+- Condition: every pitch matches the global grammar in Section 2.3, parses to one pitch number, and its pitch class belongs to the selected key's exact accepted set in Section 2.2.
 - Outcome: reject the request otherwise; score none.
 - Rationale: prevents enharmonic and parsing ambiguity.
 - Valid: `F#4` in G major and `Bb4` in F major.
-- Invalid: `Gb4`, `A#4`, `C♯4`, `c4`, or `C 4`.
+- Unsupported selected-key context: `F4` in G major, `B4` in F major, and `F#4` or `Bb4` in C major produce `UNSUPPORTED_PITCH`.
+- Invalid global format: `Gb4`, `A#4`, `C♯4`, `c4`, or `C 4` produce `INVALID_PITCH_FORMAT`.
 
 #### `SUPPORTED_CHORD` — HARD
 
@@ -177,7 +182,7 @@ For two voices:
 - contrary motion: both move and their directions differ;
 - oblique motion: exactly one moves;
 - similar motion: both move in the same direction;
-- parallel perfect motion: similar motion whose starting and ending harmonic intervals are the same perfect interval class governed by Sections 6.4–6.6.
+- parallel perfect motion: similar motion whose starting and ending harmonic intervals are the same perfect interval class governed by `PARALLEL_FIFTHS`, `PARALLEL_OCTAVES`, and `PARALLEL_UNISONS` in Sections 7.10–7.12.
 
 ## 4. Chord-member generation
 
@@ -198,13 +203,15 @@ For each event:
 
 1. Parse and validate key, chord, and Soprano notation.
 2. Preserve the supplied Soprano pitch exactly.
-3. Treat a canonically parsed, in-range Soprano pitch as supported input even when its pitch class is not a member of the event chord; chord membership is a candidate rule, not an input-syntax rule.
+3. Treat a globally canonical, selected-key-supported, in-range Soprano pitch as supported input even when its pitch class is not a member of the event chord; chord membership is a candidate rule, not an input-syntax rule. Thus C major/chord C/Soprano `D4` remains supported request input and reaches `NO_VALID_HARMONIZATION` through `CHORD_MEMBERSHIP`.
 4. Enumerate chord-member pitches inside the absolute Alto, Tenor, and Bass ranges.
 5. Constrain Bass to the chord root pitch class.
 6. Construct candidates containing the immutable Soprano and apply every vertical HARD rule, including `CHORD_MEMBERSHIP`.
 7. If the immutable Soprano is not a chord member, every candidate fails `CHORD_MEMBERSHIP`; an empty legal-candidate set produces the domain outcome `NO_VALID_HARMONIZATION`, not `INVALID_REQUEST` or `UNSUPPORTED_MUSICAL_ELEMENT`.
 
 Because only root-position triads are supported, a slash chord or non-root Bass request is unsupported. Chromatically altered chord members cannot be candidates; consequently a doubled altered tone is impossible. `SUPPORTED_CHORD` rejects the altered chord before voicing, rather than scoring an altered-tone duplication.
+
+A canonically formatted and selected-key-supported Soprano pitch outside the absolute Soprano range is a request value-constraint error: `400 INVALID_REQUEST` with field error `SOPRANO_OUT_OF_RANGE`. It is not a supported-subset error and cannot reach harmonization evaluation.
 
 ## 5. SATB ranges
 
@@ -267,7 +274,7 @@ All examples use voice order `S/A/T/B`.
 - Score: none.
 - Rationale: non-chord tones are outside the initial subset.
 - Valid on `C`: `E4/C4/G3/C3`.
-- Invalid on `C`: `D4/C4/G3/C3` because D is not in `{C,E,G}`.
+- Invalid on `C`: `A4/E4/G3/C3` because A is not in `{C,E,G}`; C, E, and G remain represented, and every other vertical HARD rule passes.
 
 ### 6.6 `COMPLETE_TRIAD` — HARD
 
@@ -276,7 +283,7 @@ All examples use voice order `S/A/T/B`.
 - Score: none.
 - Rationale: guarantees an unambiguous complete triadic sonority.
 - Valid on `C`: `G4/E4/C4/C3`.
-- Invalid on `C`: `G4/G3/C3/C2` because E is missing.
+- Invalid on `C`: `G4/G4/C4/C3` because E is missing; every pitch remains a C-chord member and every other vertical HARD rule passes.
 
 ### 6.7 `ROOT_POSITION_BASS` — HARD
 
@@ -294,7 +301,7 @@ All examples use voice order `S/A/T/B`.
 - Score: none.
 - Rationale: prevents two simultaneous mandatory resolutions to tonic.
 - Valid in C major on `G`: `G4/D4/B3/G3` contains one B.
-- Invalid in C major on `G`: `B4/G4/D4/B2` contains two Bs.
+- Invalid in C major on `G`: `B4/D4/B3/G3` contains two Bs; the complete G triad remains in root position and every other vertical HARD rule passes.
 
 ### 6.9 `THIRD_DOUBLING` — SOFT
 
@@ -350,7 +357,8 @@ Transition rules compare event `i−1` with event `i`. Three-event rules are eva
 - Score: none.
 - Rationale: bounds melodic discontinuity without encoding every species-counterpoint restriction.
 - Valid boundaries: Alto `C4→G4` is 7; Bass `C3→C4` is 12.
-- Invalid: Soprano `C4→G#4` is 8; Bass `C3→C#4` is 13.
+- Isolated upper-voice overflow in C major, chord `C` at both events: `E4/C4/G3/C3 → C5/E4/G3/C3`. Soprano moves 8 semitones; all other applicable HARD rules pass.
+- Isolated Bass overflow in F major, chords `F → C`: `A4/F4/C4/F2 → G4/E4/C4/C4`. Bass moves 19 semitones; all other applicable HARD rules pass.
 
 ### 7.3 `MELODIC_LEAP_PENALTY` — SOFT
 
@@ -525,7 +533,7 @@ After rejecting invalid paths and selecting the highest complete-path score, com
 3. Compare sequences from the first number onward.
 4. At the first difference, the path with the lower number wins.
 
-The Soprano entries are included even though tied paths share them, making the selection key fully descriptive. Candidate enumeration order, collection/hash order, parallel execution, object identity, and randomness must not affect selection. If the numeric sequences are identical, the paths are musically identical and either object representation yields the same serialized musical result; rule explanations must then be ordered by event index, scope order `VERTICAL` before `VOICE_LEADING`, and Rule ID ascending.
+The Soprano entries are included even though tied paths share them, making the selection key fully descriptive. Candidate enumeration order, collection/hash order, parallel execution, object identity, and randomness must not affect selection. If the numeric sequences are identical, the paths are musically identical and either object representation yields the same serialized musical result. REST explanation ordering is defined by each explicit scope in `docs/API.md`: event index, adjacent-transition indices, or three-event-window indices, followed by Rule ID ascending within the container.
 
 ## 9. Rule catalog
 
@@ -558,8 +566,8 @@ The Soprano entries are included even though tied paths share them, making the s
 | `SIMILAR_OUTER_MOTION` | Similar outer motion | SOFT | VOICE_LEADING | −1 | Penalize similar Soprano/Bass motion. |
 | `HIDDEN_DIRECT_FIFTH` | Hidden/direct fifth | SOFT | VOICE_LEADING | −2 | Penalize similar outer motion into fifth with Soprano skip/leap. |
 | `HIDDEN_DIRECT_OCTAVE` | Hidden/direct octave | SOFT | VOICE_LEADING | −2 | Penalize similar outer motion into octave with Soprano skip/leap. |
-| `REPEATED_DIRECTION_LEAPS` | Repeated-direction leaps | SOFT | VOICE_LEADING | −2 each | Penalize two consecutive same-direction motions >=3. |
-| `LARGE_LEAP_COMPENSATION` | Large-leap compensation | SOFT | VOICE_LEADING | −2 each | Penalize an uncompensated motion >=5. |
+| `REPEATED_DIRECTION_LEAPS` | Repeated-direction leaps | SOFT | THREE_EVENT_WINDOW | −2 each | Penalize two consecutive same-direction motions >=3. |
+| `LARGE_LEAP_COMPENSATION` | Large-leap compensation | SOFT | THREE_EVENT_WINDOW | −2 each | Penalize an uncompensated motion >=5. |
 | `STEPWISE_MOTION` | Stepwise motion | REWARD | VOICE_LEADING | +1 each | Reward motion of 1–2 semitones. |
 | `REPEATED_NOTE` | Repeated note | REWARD | VOICE_LEADING | +1 each | Reward exact pitch retention. |
 | `COMMON_TONE_RETENTION` | Common-tone retention | REWARD | VOICE_LEADING | +1 each | Reward retained Alto/Tenor common tone. |
@@ -648,14 +656,15 @@ For isolated rule tests, all non-target fields must satisfy the other HARD rules
 
 | HARD rule | Previous `S/A/T/B` | Next `S/A/T/B` | Exact reason |
 |---|---|---|---|
-| `VOICE_OVERLAP` | `G4/C4/G3/C3` | `A4/E4/D4/D3` | New Tenor D4 exceeds previous Alto C4. |
-| `MAX_MELODIC_LEAP` | `C4/G3/E3/C3` | `G5/B4/D4/G3` | Soprano moves 19 semitones, greater than 7. |
-| `PARALLEL_FIFTHS` | `E4/C4/G3/C3` | `F4/D4/A3/D3` | Bass/Tenor pair C3/G3→D3/A3 is 7→7 in the same direction. |
-| `PARALLEL_OCTAVES` | `C4/G3/E3/C3` | `D4/A3/F3/D3` | Bass/Soprano move C3/C4→D3/D4, 12→12. |
-| `PARALLEL_UNISONS` | `G4/C4/C4/C3` | `A4/D4/D4/D3` | Alto/Tenor move together from unison to unison. |
+| `VOICE_OVERLAP` (C major, `C → Dm`) | `E4/C4/G3/C3` | `A4/F4/D4/D3` | New Tenor D4 exceeds previous Alto C4; all other applicable HARD rules pass. |
+| `MAX_MELODIC_LEAP` — Soprano (C major, `C → C`) | `E4/C4/G3/C3` | `C5/E4/G3/C3` | Soprano moves 8 semitones; all other applicable HARD rules pass. |
+| `MAX_MELODIC_LEAP` — Bass (F major, `F → C`) | `A4/F4/C4/F2` | `G4/E4/C4/C4` | Bass moves 19 semitones; all other applicable HARD rules pass. |
+| `PARALLEL_FIFTHS` (C major, `C → Dm`) | `G4/E4/G3/C3` | `A4/F4/F3/D3` | Bass/Soprano move C3/G4→D3/A4, compound fifth 19→19; all other applicable HARD rules pass. |
+| `PARALLEL_OCTAVES` (C major, `C → Dm`) | `C5/G4/E4/C3` | `D5/F4/A3/D3` | Bass/Soprano move C3/C5→D3/D5, compound octave 24→24; all other applicable HARD rules pass. |
+| `PARALLEL_UNISONS` interaction (pair-level) | Alto/Tenor `C4/C4` | Alto/Tenor `D4/D4` | The pair fails `PARALLEL_UNISONS` and necessarily fails `VOICE_OVERLAP`; see the impossibility note below. |
 | `LEADING_TONE_RESOLUTION` | C major G: `B4/G4/D4/G3` | C: `G4/E4/C4/C3` | Soprano B4 moves to G4 instead of C5. |
 
-The parallel-fifths fixture is interval-isolation data; a unit test should construct the cited Bass/Tenor pair and legal values for the other voices, then assert that `PARALLEL_FIFTHS` appears among violations.
+The full-sonority parallel-fifths and parallel-octaves fixtures were checked across all six unordered voice pairs and isolate only their named target rule. An isolated full-transition `PARALLEL_UNISONS` violation is mathematically impossible under `VOICE_OVERLAP`: for two voices at unison pitch `p`, same-direction motion to unison pitch `q > p` makes the new lower voice exceed the previous upper voice; if `q < p`, the new upper voice falls below the previous lower voice. Voice order also prevents a non-adjacent unison from avoiding intervening adjacent unisons. Therefore the displayed pair-level fixture is intentionally an interaction fixture with the complete expected violation set `{PARALLEL_UNISONS, VOICE_OVERLAP}`, not an isolated fixture. Unit tests for `PARALLEL_UNISONS` must evaluate the rule directly, while combined-validator tests assert both violations in Rule ID order.
 
 ### 10.4 Boundary fixtures
 
@@ -665,15 +674,15 @@ The parallel-fifths fixture is interval-isolation data; a unit test should const
 | Highest Soprano | G chord, `S=G5/A=B4/T=D4/B=G3` | Absolute range passes; Soprano receives a comfortable-range penalty. |
 | Lowest Alto | C chord, `S=E4/A=G3/T=E3/B=C3` | Alto G3 passes. |
 | Highest Alto | Bb chord in F, `S=F5/A=D5/T=F4/B=Bb2` | Alto D5 passes and receives −1 comfortable-range penalty. |
-| Lowest Tenor | C chord, `S=G4/A=E4/T=C3/B=C3` | Tenor C3 passes. |
-| Highest Tenor | C chord, `S=G5/A=E5/T=G4/B=C3` | Tenor G4 passes and receives −1. |
+| Lowest Tenor | C chord, `S=E4/A=G3/T=C3/B=C3` | Tenor C3 passes; the complete root-position sonority passes every HARD rule. |
+| Highest Tenor | C chord, `S=E5/A=C5/T=G4/B=C3` | Tenor G4 passes and receives −1; the complete root-position sonority passes every HARD rule. |
 | Lowest Bass | Em chord in C, `S=G4/A=E4/T=B3/B=E2` | Bass E2 passes and receives −1. |
 | Highest Bass | C chord, `S=G4/A=E4/T=C4/B=C4` | Bass C4 passes and receives −1; equal T/B does not cross. |
 | Maximum S–A spacing | C chord, `S=E5/A=E4/T=G3/B=C3` | 12 semitones passes. |
-| Maximum A–T spacing | C chord, `S=G5/A=E5/T=E4/B=C3` | 12 semitones passes. |
+| Maximum A–T spacing | G chord in G major, `S=D5/A=B4/T=B3/B=G3` | 12 semitones passes; the complete root-position sonority passes every HARD rule. |
 | Maximum T–B spacing | G chord, `S=B4/A=G4/T=D4/B=G2` | 19 semitones passes. |
-| Maximum upper-voice leap | Alto `C4→G4` | 7 semitones passes, with −2 leap penalty. |
-| Maximum Bass leap | Bass `C3→C4` | 12 semitones passes, with −2 leap penalty. |
+| Maximum upper-voice leap | C major, `C → G`: `E4/C4/G3/C3 → B4/D4/G3/G3` | Soprano moves 7 semitones and receives −2; both complete root-position sonorities and every HARD transition rule pass. |
+| Maximum Bass leap | C major, `C → C`: `G4/E4/C4/C3 → G4/E4/C4/C4` | Bass moves 12 semitones and receives −2; both complete root-position sonorities and every HARD transition rule pass. |
 
 ### 10.5 No-solution fixtures
 
@@ -722,15 +731,15 @@ All three inputs are syntactically valid and use supported keys, chords, pitches
 | Tie-break | Lexicographically lowest event-major B/T/A/S pitch-number sequence. |
 | Phrase length | 1–8 events inclusive for `satb-initial-1`. |
 | BPM range | **DEFERRED TO TECH LEAD** with Music Theory input in M5; BPM does not affect pitch-only search complexity. |
-| Maximum JSON body size and processing timeout | **DEFERRED TO TECH LEAD**; these are operational constraints. |
-| Out-of-range HTTP status | **DEFERRED TO TECH LEAD**; API transport semantics are not music theory. |
-| End-user explanation depth | **DEFERRED TO TECH LEAD** with Product/Mobile input; selected-path rule IDs and scores remain required by architecture. |
+| Maximum JSON body size and processing timeout | Resolved for M4: 16384 raw bytes and a 2-second protective harmonization ceiling; transport semantics are normative in `docs/API.md`. |
+| Out-of-range HTTP status | Resolved for M4: a canonical, key-supported Soprano outside its absolute range is `400 INVALID_REQUEST` / `SOPRANO_OUT_OF_RANGE`. |
+| Selected-path explanation schema | Resolved for M4: deterministic `events`, `transitions`, and `windows` arrays as defined in `docs/API.md`; end-user display depth remains an M5/M6 product question. |
 | Rhythmic event schema, ties, rests, pickups, multiple notes per chord | **DEFERRED TO TECH LEAD** with Music Theory input in M5. The first technical milestone remains one chord and one pitch per event. |
 
 ## 12. Implementation-neutral acceptance notes
 
 - Every catalog rule must have an isolated test named from its stable Rule ID.
-- Combined validation may report multiple HARD violations in deterministic Rule ID order.
+- Combined domain-rule validation may report multiple HARD violations in deterministic Rule ID order. Request field-error precedence and ordering are defined separately in `docs/API.md`.
 - Candidate generation may prune immediately after a HARD violation but must not change the musical result or tie-break.
 - Golden fixtures must assert both exact output where intended and all invariants; an exact fixture alone is not proof of validity.
 - Any future change to supported notation, rule category, weight, or tie-break requires a new `ruleSetVersion`.

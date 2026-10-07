@@ -115,11 +115,11 @@ Scope:
 Acceptance criteria:
 
 1. Valid documented requests return `200` and conform to `docs/API.md`.
-2. Invalid/unsupported requests return `400` or `422` with stable error codes as documented.
+2. Invalid/unsupported requests return `400` or `422` with stable error codes, precedence, aggregation, and ordering as documented.
 3. Valid requests with no solution return `422` with `NO_VALID_HARMONIZATION`.
-4. Contract tests cover examples, unknown/missing fields, status codes, and media type.
+4. Contract tests cover examples, unknown/missing fields, mixed validation errors, status codes, media type, the 16384-byte raw-body boundary, and the 2-second harmonization timeout.
 5. REST DTOs and Spring annotations do not enter the music domain.
-6. API responses expose engine and rule-set versions plus selected-path explanation.
+6. API responses expose engine and rule-set versions plus deterministic event, transition, and three-event-window selected-path explanations whose contributions reconcile to the total score.
 7. No persistence, account, cloud, or export code is added.
 
 ### M5 — Rhythmic MVP input

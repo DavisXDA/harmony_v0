@@ -41,8 +41,8 @@ Validation rules:
 - `key`, `chords`, and `melody` are required and non-null;
 - `chords` and `melody` are non-empty and have equal lengths;
 - length is 1–8 events inclusive;
-- every key, chord, and pitch uses supported canonical notation;
-- every Soprano pitch is in the approved Soprano range;
+- every pitch first uses the global canonical grammar and then belongs to the exact pitch-class set accepted by the selected key in `docs/MUSIC_RULES.md`;
+- every Soprano pitch is in the approved Soprano range; a canonically formatted, key-supported pitch outside that range is `400 INVALID_REQUEST` with field code `SOPRANO_OUT_OF_RANGE`;
 - event `i` pairs `chords[i]` with `melody[i]`.
 
 ### 3.2 Success response
@@ -78,7 +78,9 @@ The response is the result of a synchronous computation. No harmonization resour
           }
         ]
       }
-    ]
+    ],
+    "transitions": [],
+    "windows": []
   }
 }
 ```
@@ -90,8 +92,73 @@ Required success invariants:
 - all four voice arrays have the same length as `chords`;
 - `voices.soprano` exactly equals request `melody`;
 - all returned voices satisfy every enabled HARD rule;
-- `evaluation.score` equals the sum defined by the versioned scoring rules;
-- rules and events appear in a documented stable order.
+- `evaluation.events` contains vertical/event contributions, `evaluation.transitions` contains adjacent-event contributions, and `evaluation.windows` contains three-event contributions;
+- all three arrays exist even when empty;
+- `evaluation.score` equals the sum of every nonzero `scoreContribution` in those three arrays, with no contribution duplicated across scopes;
+- events are ordered by `eventIndex` ascending; transitions by `fromEventIndex`, then `toEventIndex`; windows by `startEventIndex`, then `middleEventIndex`, then `endEventIndex`; and `rules` within every container by `ruleId` ascending.
+
+### 3.3 Normative evaluation shape
+
+The selected-path explanation has exactly these three rule containers:
+
+```json
+{
+  "evaluation": {
+    "score": -1,
+    "selectionKey": "C3-G3-E4-E4|F3-A3-C4-F4|G3-G3-B3-G4",
+    "events": [
+      {
+        "eventIndex": 0,
+        "rules": [
+          {
+            "ruleId": "ROOT_DOUBLING",
+            "category": "REWARD",
+            "outcome": "APPLIED",
+            "scoreContribution": 2
+          }
+        ]
+      }
+    ],
+    "transitions": [
+      {
+        "fromEventIndex": 0,
+        "toEventIndex": 1,
+        "rules": [
+          {
+            "ruleId": "STEPWISE_MOTION",
+            "category": "REWARD",
+            "outcome": "APPLIED",
+            "scoreContribution": 1
+          }
+        ]
+      }
+    ],
+    "windows": [
+      {
+        "startEventIndex": 0,
+        "middleEventIndex": 1,
+        "endEventIndex": 2,
+        "rules": [
+          {
+            "ruleId": "LARGE_LEAP_COMPENSATION",
+            "category": "SOFT",
+            "outcome": "APPLIED",
+            "scoreContribution": -2
+          },
+          {
+            "ruleId": "REPEATED_DIRECTION_LEAPS",
+            "category": "SOFT",
+            "outcome": "APPLIED",
+            "scoreContribution": -2
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+This fragment specifies shape, placement, ordering, and score reconciliation (`2 + 1 - 2 - 2 = -1`); it is not a complete harmonization example. `REPEATED_DIRECTION_LEAPS` and `LARGE_LEAP_COMPENSATION` always belong in `windows`. HARD rules contribute no score and need not appear in a successful selected-path payload; if included as passed audit records, their contribution is zero and they remain in their natural scope. No rule evaluation or contribution may be copied into another scope.
 
 ## 4. Error response
 
@@ -127,9 +194,11 @@ For privacy and log safety, `rejectedValue` may be omitted. Clients must branch 
 |---|---|---|
 | `400 Bad Request` | `MALFORMED_JSON` | Body is not valid JSON. |
 | `400 Bad Request` | `INVALID_REQUEST` | Required fields, types, array alignment, numeric bounds, or strict schema are invalid. |
+| `413 Payload Too Large` | `REQUEST_TOO_LARGE` | Raw request body exceeds 16384 bytes; rejected before JSON processing. |
 | `422 Unprocessable Content` | `UNSUPPORTED_MUSICAL_ELEMENT` | Request is structurally valid but contains notation or a musical construct outside the enabled rule set. |
 | `422 Unprocessable Content` | `NO_VALID_HARMONIZATION` | Supported, valid input has no path satisfying all HARD rules. |
 | `415 Unsupported Media Type` | `UNSUPPORTED_MEDIA_TYPE` | Content type is not accepted. |
+| `503 Service Unavailable` | `HARMONIZATION_TIMEOUT` | Deterministic harmonization computation exceeded 2 seconds; no partial harmonization is returned. |
 | `500 Internal Server Error` | `INTERNAL_ERROR` | Unexpected failure; no implementation details are exposed. |
 
 Representative field error codes:
@@ -147,9 +216,30 @@ Representative field error codes:
 - `UNSUPPORTED_PITCH`;
 - `SOPRANO_OUT_OF_RANGE`.
 
-`INVALID_PITCH_FORMAT` means the string cannot be parsed using canonical pitch syntax; for example, `H4` is malformed. `UNSUPPORTED_PITCH` means the string is syntactically valid pitch notation but is outside the enabled musical subset or key context. These codes are distinct and must not be used interchangeably.
+`INVALID_PITCH_FORMAT` means the string cannot be parsed using the global canonical grammar; `H4`, `Gb4`, and `A#4` are examples. `UNSUPPORTED_PITCH` means the pitch is globally canonical but its pitch class is not accepted by the selected key: `F4` in G major, `B4` in F major, and `F#4` or `Bb4` in C major. `F#4` is supported in G major and `Bb4` is supported in F major. A supported C-major scale pitch that is not a current chord member, such as `D4` over chord `C`, passes request validation and can produce `NO_VALID_HARMONIZATION` through `CHORD_MEMBERSHIP`. These codes and outcomes must not be used interchangeably.
 
-### 5.1 No-solution example
+### 5.1 Validation aggregation, precedence, and ordering
+
+Validation proceeds in this order:
+
+1. Reject a raw body over 16384 bytes before JSON processing with `413 REQUEST_TOO_LARGE`.
+2. Fail immediately on malformed JSON with `400 MALFORMED_JSON`.
+3. For structurally readable JSON, collect all independently determinable category-1 structural, type, required, format, and range errors.
+4. Evaluate category-2 supported-subset and key-context errors only where their prerequisites parsed successfully, collecting all independently determinable errors.
+5. Run harmonization domain evaluation only if request validation is completely successful.
+
+If any category-1 error exists, the envelope is `400 INVALID_REQUEST`, even when category-2 errors were also independently determinable. If no category-1 error exists but at least one category-2 error exists, the envelope is `422 UNSUPPORTED_MUSICAL_ELEMENT`. `NO_VALID_HARMONIZATION` is never combined with request-validation errors.
+
+Dependent validation does not invent secondary errors. For example, an unparseable `key` may coexist with independently determinable melody format or Soprano-range errors, but it suppresses key-dependent pitch-context and chord-context checks.
+
+Field errors use this deterministic order:
+
+1. known top-level fields in the order `key`, `chords`, `melody`;
+2. array elements at the same field in ascending index order;
+3. multiple errors at the same location by field error `code` ascending;
+4. unknown top-level fields after known fields, in lexical field-name order.
+
+### 5.2 No-solution example
 
 Status: `422 Unprocessable Content`
 
@@ -181,10 +271,12 @@ For identical normalized input, `engineVersion`, and `ruleSetVersion`, these fie
 
 ## 7. Limits and security controls
 
-The musical limit is fixed at 8 events per request. Before implementation, Phase 0 must assign the remaining operational limits:
+The musical phrase limit is 1–8 events inclusive. It is separate from these operational limits:
 
-- maximum JSON body size;
-- processing timeout.
+- maximum raw JSON request body: 16 KiB = 16384 bytes; byte 16384 is accepted and byte 16385 is rejected with `413 REQUEST_TOO_LARGE` before JSON processing;
+- harmonization processing timeout: 2 seconds; if deterministic harmonization computation exceeds this protective ceiling, return `503 HARMONIZATION_TIMEOUT` and no partial harmonization.
+
+The 2-second ceiling is a protective processing bound, not a latency SLO. Request reading and validation order follow Section 5.1; harmonization timing begins when validated input enters deterministic harmonization computation.
 
 Supported keys, chord types, and pitch/voice ranges are defined in `docs/MUSIC_RULES.md`.
 
@@ -232,15 +324,18 @@ At minimum, implementation must test:
 4. unequal chord/melody lengths and phrase limits;
 5. malformed versus unsupported key, chord, and pitch notation;
 6. Soprano range boundaries;
-7. no-solution mapping;
-8. unsupported media type;
-9. deterministic musical payload across repeated requests;
-10. absence of stack traces or internal exception details in errors.
+7. exact key-sensitive pitch cases: `F4` in G, `B4` in F, `F#4` and `Bb4` in C, supported `F#4` in G and `Bb4` in F, and invalid-format `Gb4` and `A#4`;
+8. `400 INVALID_REQUEST` / `SOPRANO_OUT_OF_RANGE` and mixed-error precedence, dependency suppression, and deterministic field-error ordering;
+9. no-solution mapping, including C major/chord C/Soprano D4 through `CHORD_MEMBERSHIP`;
+10. bodies of exactly 16384 and 16385 bytes, proving rejection occurs before JSON processing;
+11. the 2-second harmonization ceiling, `503 HARMONIZATION_TIMEOUT`, and absence of partial output;
+12. event, transition, and three-event-window explanation shapes, empty arrays, deterministic ordering, non-duplication, and exact score reconciliation;
+13. unsupported media type;
+14. deterministic musical payload across repeated requests;
+15. absence of stack traces or internal exception details in errors.
 
 ## 10. Open contract questions
 
 1. What canonical duration grammar will M5 accept? Initial key, chord, accidental, and pitch grammar is resolved in `docs/MUSIC_RULES.md`.
-2. What JSON body-size and processing-time limits apply? The initial musical phrase limit is 1–8 events.
-3. Should supported-but-out-of-range pitch return `400` or `422`? The current proposal uses `400` as a value constraint.
-4. How much selected-path explanation is required by the mobile UI?
-5. Will the rhythmic event shape replace the parallel `chords`/`melody` arrays before public `v1`, avoiding two long-lived request shapes?
+2. How much of the required selected-path explanation should the mobile UI display?
+3. Will the rhythmic event shape replace the parallel `chords`/`melody` arrays before public `v1`, avoiding two long-lived request shapes?

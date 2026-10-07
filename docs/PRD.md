@@ -123,7 +123,7 @@ BPM, time signature, and durations belong to the MVP product contract but are de
 | NFR-03 Testability | The music domain and engine must run in plain Java tests without Spring or external services. |
 | NFR-04 Explainability | Every scored result must identify applied rules and their score contributions; hard-rule violations must be identifiable during evaluation. |
 | NFR-05 Simplicity | Use a modular monolith and in-process rule engine; no database, queue, or microservice is required. |
-| NFR-06 Performance | Establish a measured baseline before setting a latency SLO. Candidate search must have explicit input limits to prevent unbounded work. |
+| NFR-06 Performance | Establish a measured baseline before setting a latency SLO. Candidate search is bounded by 1–8 events and a 2-second protective processing ceiling; the ceiling is not a latency SLO. |
 | NFR-07 Reliability | Malformed or unsupported input must produce a controlled error response and must not expose implementation details. |
 | NFR-08 Maintainability | Rules are individually testable and categorized as HARD, SOFT, or REWARD. |
 | NFR-09 Compatibility | The REST contract is versioned from its first implementation. |
@@ -135,6 +135,7 @@ BPM, time signature, and durations belong to the MVP product contract but are de
 - The first technical milestone supports only the key, chord, pitch, chord-type, accidental, and range subset approved in `docs/MUSIC_RULES.md`.
 - Enharmonic spelling and inversion behavior must be intentional, not inferred ad hoc.
 - The initial phrase length is 1–8 events as defined in `docs/MUSIC_RULES.md`; BPM bounds remain open for M5.
+- The initial REST operation accepts at most 16384 raw request-body bytes and applies a 2-second harmonization processing ceiling, as defined in `docs/API.md`.
 - When no valid candidate exists, the system reports failure; it does not weaken HARD rules.
 
 ## 9. First technical milestone acceptance criteria
