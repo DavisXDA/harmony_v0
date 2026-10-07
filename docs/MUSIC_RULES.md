@@ -198,10 +198,11 @@ For each event:
 
 1. Parse and validate key, chord, and Soprano notation.
 2. Preserve the supplied Soprano pitch exactly.
-3. Reject the event if Soprano is not a member of the chord.
+3. Treat a canonically parsed, in-range Soprano pitch as supported input even when its pitch class is not a member of the event chord; chord membership is a candidate rule, not an input-syntax rule.
 4. Enumerate chord-member pitches inside the absolute Alto, Tenor, and Bass ranges.
 5. Constrain Bass to the chord root pitch class.
-6. Construct four-voice candidates and apply every vertical HARD rule.
+6. Construct candidates containing the immutable Soprano and apply every vertical HARD rule, including `CHORD_MEMBERSHIP`.
+7. If the immutable Soprano is not a chord member, every candidate fails `CHORD_MEMBERSHIP`; an empty legal-candidate set produces the domain outcome `NO_VALID_HARMONIZATION`, not `INVALID_REQUEST` or `UNSUPPORTED_MUSICAL_ELEMENT`.
 
 Because only root-position triads are supported, a slash chord or non-root Bass request is unsupported. Chromatically altered chord members cannot be candidates; consequently a doubled altered tone is impossible. `SUPPORTED_CHORD` rejects the altered chord before voicing, rather than scoring an altered-tone duplication.
 

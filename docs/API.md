@@ -31,8 +31,8 @@ Creates a harmonization synchronously from aligned chords and Soprano melody pit
 ```json
 {
   "key": "C",
-  "chords": ["C", "F", "G", "C"],
-  "melody": ["E4", "F4", "G4", "C5"]
+  "chords": ["C"],
+  "melody": ["C5"]
 }
 ```
 
@@ -58,23 +58,23 @@ The response is the result of a synchronous computation. No harmonization resour
   "ruleSetVersion": "satb-initial-1",
   "key": "C",
   "voices": {
-    "soprano": ["E4", "F4", "G4", "C5"],
-    "alto": ["C4", "C4", "D4", "E4"],
-    "tenor": ["G3", "A3", "B3", "G3"],
-    "bass": ["C3", "F3", "G3", "C3"]
+    "soprano": ["C5"],
+    "alto": ["E4"],
+    "tenor": ["G3"],
+    "bass": ["C3"]
   },
   "evaluation": {
-    "score": 12,
-    "selectionKey": "C3-G3-C4-E4|F3-A3-C4-F4|G3-B3-D4-G4|C3-G3-E4-C5",
+    "score": 2,
+    "selectionKey": "C3-G3-E4-C5",
     "events": [
       {
         "eventIndex": 0,
         "rules": [
           {
-            "ruleId": "COMMON_TONE_RETENTION",
+            "ruleId": "ROOT_DOUBLING",
             "category": "REWARD",
-            "outcome": "NOT_APPLICABLE",
-            "scoreContribution": 0
+            "outcome": "APPLIED",
+            "scoreContribution": 2
           }
         ]
       }
@@ -83,7 +83,7 @@ The response is the result of a synchronous computation. No harmonization resour
 }
 ```
 
-The notes above illustrate shape only. They are not normative until the Music Theory Agent confirms they satisfy the approved initial rules. `selectionKey` is a stable description of the chosen path/tie-break, not a public algorithm promise; clients should display it only for diagnostics.
+This is a normative `satb-initial-1` success example. All four pitches are inside their absolute and comfortable ranges; the complete C-major triad is in root position with C doubled; and no transition rules apply to the single event. `ROOT_DOUBLING` is the only nonzero score contribution, so the total is +2. `selectionKey` uses Bass, Tenor, Alto, Soprano order. It is a stable description of the chosen path/tie-break, not a public algorithm promise; clients should display it only for diagnostics.
 
 Required success invariants:
 
@@ -109,8 +109,8 @@ All controlled errors share this envelope:
   "errors": [
     {
       "field": "melody[1]",
-      "code": "UNSUPPORTED_PITCH",
-      "message": "The pitch is not supported by this rule set.",
+      "code": "INVALID_PITCH_FORMAT",
+      "message": "The pitch cannot be parsed using canonical pitch syntax.",
       "rejectedValue": "H4"
     }
   ]
@@ -146,6 +146,8 @@ Representative field error codes:
 - `INVALID_PITCH_FORMAT`;
 - `UNSUPPORTED_PITCH`;
 - `SOPRANO_OUT_OF_RANGE`.
+
+`INVALID_PITCH_FORMAT` means the string cannot be parsed using canonical pitch syntax; for example, `H4` is malformed. `UNSUPPORTED_PITCH` means the string is syntactically valid pitch notation but is outside the enabled musical subset or key context. These codes are distinct and must not be used interchangeably.
 
 ### 5.1 No-solution example
 
