@@ -114,7 +114,7 @@ Scope:
 
 Acceptance criteria:
 
-1. Valid documented requests return `201` and conform to `docs/API.md`.
+1. Valid documented requests return `200` and conform to `docs/API.md`.
 2. Invalid/unsupported requests return `400` or `422` with stable error codes as documented.
 3. Valid requests with no solution return `422` with `NO_VALID_HARMONIZATION`.
 4. Contract tests cover examples, unknown/missing fields, status codes, and media type.
@@ -219,4 +219,3 @@ M0 -> M1 -> M2 -> M3 -> M4 -> M5 -> M6 -> M7
 ```
 
 M1 model discovery may inform M2, but M2 cannot be accepted before its rule catalog is approved. M6 should not begin against an unstable API. Parallel work is appropriate only when contracts are already explicit and the work does not bypass a milestone gate.
-
