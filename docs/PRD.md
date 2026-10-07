@@ -134,7 +134,7 @@ BPM, time signature, and durations belong to the MVP product contract but are de
 - Initial harmony is homorhythmic: one chord corresponds to one Soprano event and one note in each generated voice.
 - The first technical milestone supports only the key, chord, pitch, chord-type, accidental, and range subset approved in `docs/MUSIC_RULES.md`.
 - Enharmonic spelling and inversion behavior must be intentional, not inferred ad hoc.
-- Input size limits and BPM bounds remain open until the supported musical subset is approved.
+- The initial phrase length is 1–8 events as defined in `docs/MUSIC_RULES.md`; BPM bounds remain open for M5.
 - When no valid candidate exists, the system reports failure; it does not weaken HARD rules.
 
 ## 9. First technical milestone acceptance criteria
@@ -165,10 +165,7 @@ These are correctness gates, not adoption metrics. User adoption and arrangement
 
 The following require explicit decisions before implementation of the affected behavior:
 
-1. Which keys, modes, chord qualities, inversions, accidentals, and non-chord tones are supported first?
-2. Which SATB ranges, spacing limits, doubling rules, and voice-leading rules are HARD versus SOFT?
-3. What exact notation is canonical for pitches, keys, chord symbols, and durations?
-4. What maximum phrase length and BPM range keep the initial search bounded?
-5. Is the first MVP limited to one chord per melody note, or must it later support multiple notes per chord and ties?
-6. How much explanation should be returned to end users versus retained for diagnostics?
-
+1. What canonical duration notation will M5 support? Pitch, key, and chord notation are resolved in `docs/MUSIC_RULES.md`.
+2. What BPM range will M5 support? The initial pitch-only phrase limit is resolved as 1–8 events.
+3. Will M5 remain limited to one chord per melody note, or add multiple notes per chord and ties?
+4. How much selected-path explanation should be displayed to end users versus retained for diagnostics?

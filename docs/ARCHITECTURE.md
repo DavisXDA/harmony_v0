@@ -179,7 +179,7 @@ Candidates are ordered by:
 2. stable musical tie-break fields, such as ordered MIDI-equivalent pitch values for Bass, Tenor, Alto, then Soprano;
 3. never collection iteration order, object identity, randomness, or thread timing.
 
-The exact scoring sign and tie-break fields must be finalized before implementation and recorded in `docs/MUSIC_RULES.md`.
+The exact scoring convention and tie-break fields are defined in `docs/MUSIC_RULES.md` and require Phase 0 review before implementation.
 
 ### 6.4 Outcomes
 
@@ -291,4 +291,3 @@ Before application implementation begins, Phase 0 review must approve:
 - export formats;
 - advanced playback and score rendering;
 - microservices or multi-module decomposition.
-

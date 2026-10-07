@@ -16,7 +16,7 @@ This document defines the proposed contract; it does not create or authorize a S
 - Event and error ordering is deterministic.
 - Unknown fields are rejected to catch client mistakes early.
 - Musical notation is case-sensitive and must use the canonical subset approved in `docs/MUSIC_RULES.md`.
-- Examples use scientific pitch notation such as `C4`; final accidental and chord-symbol syntax remains a Phase 0 decision.
+- Pitch, key, accidental, and chord syntax follows the canonical initial subset in `docs/MUSIC_RULES.md`.
 - The service does not infer, transpose, or repair unsupported musical input.
 - A request is not persisted. `id` identifies the response instance for tracing and is not a retrievable resource guarantee.
 
@@ -40,7 +40,7 @@ Validation rules:
 
 - `key`, `chords`, and `melody` are required and non-null;
 - `chords` and `melody` are non-empty and have equal lengths;
-- length does not exceed the approved initial phrase limit;
+- length is 1–8 events inclusive;
 - every key, chord, and pitch uses supported canonical notation;
 - every Soprano pitch is in the approved Soprano range;
 - event `i` pairs `chords[i]` with `melody[i]`.
@@ -179,12 +179,12 @@ For identical normalized input, `engineVersion`, and `ruleSetVersion`, these fie
 
 ## 7. Limits and security controls
 
-Before implementation, Phase 0 must assign concrete values for:
+The musical limit is fixed at 8 events per request. Before implementation, Phase 0 must assign the remaining operational limits:
 
-- maximum events per request;
 - maximum JSON body size;
-- supported keys, chord types, and pitch range;
 - processing timeout.
+
+Supported keys, chord types, and pitch/voice ranges are defined in `docs/MUSIC_RULES.md`.
 
 The API must enforce these limits before or during bounded search. Rate limiting and authentication are deployment concerns and are not part of the first MVP.
 
@@ -237,8 +237,8 @@ At minimum, implementation must test:
 
 ## 10. Open contract questions
 
-1. What canonical key, chord, accidental, pitch, and duration grammar will be accepted?
-2. What concrete request and phrase limits apply?
+1. What canonical duration grammar will M5 accept? Initial key, chord, accidental, and pitch grammar is resolved in `docs/MUSIC_RULES.md`.
+2. What JSON body-size and processing-time limits apply? The initial musical phrase limit is 1–8 events.
 3. Should supported-but-out-of-range pitch return `400` or `422`? The current proposal uses `400` as a value constraint.
 4. How much selected-path explanation is required by the mobile UI?
 5. Will the rhythmic event shape replace the parallel `chords`/`melody` arrays before public `v1`, avoiding two long-lived request shapes?
