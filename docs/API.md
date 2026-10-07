@@ -47,9 +47,9 @@ Validation rules:
 
 ### 3.2 Success response
 
-Status: `201 Created`
+Status: `200 OK`
 
-No `Location` header is required because retrieval/persistence is out of scope.
+The response is the result of a synchronous computation. No harmonization resource is created or persisted, and no `Location` header is returned.
 
 ```json
 {
@@ -240,7 +240,5 @@ At minimum, implementation must test:
 1. What canonical key, chord, accidental, pitch, and duration grammar will be accepted?
 2. What concrete request and phrase limits apply?
 3. Should supported-but-out-of-range pitch return `400` or `422`? The current proposal uses `400` as a value constraint.
-4. Should the initial success use `200 OK` for a computation or `201 Created` for a produced arrangement? This draft proposes `201` without persistence; review is required.
-5. How much selected-path explanation is required by the mobile UI?
-6. Will the rhythmic event shape replace the parallel `chords`/`melody` arrays before public `v1`, avoiding two long-lived request shapes?
-
+4. How much selected-path explanation is required by the mobile UI?
+5. Will the rhythmic event shape replace the parallel `chords`/`melody` arrays before public `v1`, avoiding two long-lived request shapes?
