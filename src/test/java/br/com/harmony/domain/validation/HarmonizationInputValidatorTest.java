@@ -50,6 +50,21 @@ class HarmonizationInputValidatorTest {
         assertValid(new HarmonizationInput("C", List.of("C"), List.of("D4")));
     }
 
+    @Test void arrayElementErrorsUseNumericIndexOrdering() {
+        List<String> melody = new java.util.ArrayList<>(Collections.nCopies(11, "C4"));
+        melody.set(2, "H4");
+        melody.set(10, "H4");
+
+        List<String> fields = validator.validate(new HarmonizationInput(
+                        "C", Collections.nCopies(11, "C"), melody))
+                .errors().stream()
+                .map(ValidationError::field)
+                .filter(field -> field.startsWith("melody["))
+                .toList();
+
+        assertEquals(List.of("melody[2]", "melody[10]"), fields);
+    }
+
     @ParameterizedTest @CsvSource({"D,UNSUPPORTED_KEY", "Am,INVALID_KEY_FORMAT", "C major,INVALID_KEY_FORMAT"})
     void distinguishesKeyErrors(String key, ValidationErrorCode expected) {
         assertHasCode(new HarmonizationInput(key, List.of("C"), List.of("C4")), expected);

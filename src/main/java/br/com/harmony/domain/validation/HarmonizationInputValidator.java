@@ -6,6 +6,7 @@ import br.com.harmony.domain.music.Pitch;
 import br.com.harmony.domain.music.SupportedChords;
 import br.com.harmony.domain.music.Voice;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -13,16 +14,23 @@ public final class HarmonizationInputValidator {
     private static final int MAX_EVENTS = 8;
     private static final Pattern KEY_FORMAT = Pattern.compile("^[A-G](?:#|b)?$");
     private static final Pattern CHORD_FORMAT = Pattern.compile("^(C|D|E|F|G|A|B|F#|Bb)m?$");
+    private static final Comparator<ValidationError> ERROR_ORDER = Comparator
+            .comparingInt((ValidationError error) -> fieldOrder(error.field()))
+            .thenComparing(ValidationError::field, HarmonizationInputValidator::compareLocations)
+            .thenComparing(error -> error.code().name());
 
     public ValidationResult validate(HarmonizationInput input) {
-        if (input == null) return new ValidationResult(null, List.of(error("request", ValidationErrorCode.REQUIRED_FIELD, "Input is required.", null)));
+        if (input == null) return ValidationResult.failure(List.of(error("request", ValidationErrorCode.REQUIRED_FIELD, "Input is required.", null)));
         List<ValidationError> errors = new ArrayList<>();
         Key key = validateKey(input.key(), errors);
         validateSequences(input, errors);
         List<Chord> chords = validateChords(input.chords(), key, errors);
         List<Pitch> melody = validateMelody(input.melody(), key, errors);
-        if (!errors.isEmpty()) return new ValidationResult(null, errors);
-        return new ValidationResult(new ValidatedHarmonizationInput(key, chords, melody), List.of());
+        if (!errors.isEmpty()) {
+            errors.sort(ERROR_ORDER);
+            return ValidationResult.failure(errors);
+        }
+        return ValidationResult.success(new ValidatedHarmonizationInput(key, chords, melody));
     }
 
     private Key validateKey(String value, List<ValidationError> errors) {
@@ -70,13 +78,38 @@ public final class HarmonizationInputValidator {
                 errors.add(error("melody[" + i + "]", ValidationErrorCode.INVALID_PITCH_FORMAT, "Pitch is not canonical.", value)); continue;
             }
             result.add(pitch);
-            if (key == null) continue;
-            if (!key.supports(pitch.pitchClass()))
-                errors.add(error("melody[" + i + "]", ValidationErrorCode.UNSUPPORTED_PITCH, "Pitch is unsupported in the selected key.", value));
-            else if (!Voice.SOPRANO.isWithinAbsoluteRange(pitch))
+            if (!Voice.SOPRANO.isWithinAbsoluteRange(pitch))
                 errors.add(error("melody[" + i + "]", ValidationErrorCode.SOPRANO_OUT_OF_RANGE, "Pitch is outside the Soprano absolute range.", value));
+            if (key != null && !key.supports(pitch.pitchClass()))
+                errors.add(error("melody[" + i + "]", ValidationErrorCode.UNSUPPORTED_PITCH, "Pitch is unsupported in the selected key.", value));
         }
         return result;
+    }
+
+    private static int fieldOrder(String field) {
+        if (field.equals("key")) return 0;
+        if (field.equals("chords") || field.startsWith("chords[")) return 1;
+        if (field.equals("melody") || field.startsWith("melody[")) return 2;
+        return 3;
+    }
+
+    private static int compareLocations(String left, String right) {
+        String leftBase = baseField(left);
+        String rightBase = baseField(right);
+        int baseComparison = leftBase.compareTo(rightBase);
+        if (baseComparison != 0) return baseComparison;
+        return Integer.compare(arrayIndex(left), arrayIndex(right));
+    }
+
+    private static String baseField(String field) {
+        int bracket = field.indexOf('[');
+        return bracket < 0 ? field : field.substring(0, bracket);
+    }
+
+    private static int arrayIndex(String field) {
+        int openingBracket = field.indexOf('[');
+        if (openingBracket < 0) return -1;
+        return Integer.parseInt(field.substring(openingBracket + 1, field.length() - 1));
     }
 
     private static ValidationError error(String field, ValidationErrorCode code, String message, String rejectedValue) {
