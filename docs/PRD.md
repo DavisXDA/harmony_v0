@@ -123,7 +123,7 @@ BPM, time signature, and durations belong to the MVP product contract but are de
 | NFR-03 Testability | The music domain and engine must run in plain Java tests without Spring or external services. |
 | NFR-04 Explainability | Every scored result must identify applied rules and their score contributions; hard-rule violations must be identifiable during evaluation. |
 | NFR-05 Simplicity | Use a modular monolith and in-process rule engine; no database, queue, or microservice is required. |
-| NFR-06 Performance | Establish a measured baseline before setting a latency SLO. Candidate search must have explicit input limits to prevent unbounded work. |
+| NFR-06 Performance | Establish a measured baseline before setting a latency SLO. Candidate search is bounded by 1–8 events and a 2-second protective processing ceiling; the ceiling is not a latency SLO. |
 | NFR-07 Reliability | Malformed or unsupported input must produce a controlled error response and must not expose implementation details. |
 | NFR-08 Maintainability | Rules are individually testable and categorized as HARD, SOFT, or REWARD. |
 | NFR-09 Compatibility | The REST contract is versioned from its first implementation. |
@@ -134,7 +134,8 @@ BPM, time signature, and durations belong to the MVP product contract but are de
 - Initial harmony is homorhythmic: one chord corresponds to one Soprano event and one note in each generated voice.
 - The first technical milestone supports only the key, chord, pitch, chord-type, accidental, and range subset approved in `docs/MUSIC_RULES.md`.
 - Enharmonic spelling and inversion behavior must be intentional, not inferred ad hoc.
-- Input size limits and BPM bounds remain open until the supported musical subset is approved.
+- The initial phrase length is 1–8 events as defined in `docs/MUSIC_RULES.md`; BPM bounds remain open for M5.
+- The initial REST operation accepts at most 16384 raw request-body bytes and applies a 2-second harmonization processing ceiling, as defined in `docs/API.md`.
 - When no valid candidate exists, the system reports failure; it does not weaken HARD rules.
 
 ## 9. First technical milestone acceptance criteria
@@ -165,10 +166,7 @@ These are correctness gates, not adoption metrics. User adoption and arrangement
 
 The following require explicit decisions before implementation of the affected behavior:
 
-1. Which keys, modes, chord qualities, inversions, accidentals, and non-chord tones are supported first?
-2. Which SATB ranges, spacing limits, doubling rules, and voice-leading rules are HARD versus SOFT?
-3. What exact notation is canonical for pitches, keys, chord symbols, and durations?
-4. What maximum phrase length and BPM range keep the initial search bounded?
-5. Is the first MVP limited to one chord per melody note, or must it later support multiple notes per chord and ties?
-6. How much explanation should be returned to end users versus retained for diagnostics?
-
+1. What canonical duration notation will M5 support? Pitch, key, and chord notation are resolved in `docs/MUSIC_RULES.md`.
+2. What BPM range will M5 support? The initial pitch-only phrase limit is resolved as 1–8 events.
+3. Will M5 remain limited to one chord per melody note, or add multiple notes per chord and ties?
+4. How much selected-path explanation should be displayed to end users versus retained for diagnostics?

@@ -82,6 +82,8 @@ Owns rule identity, category, evaluation context, outcome, and score contributio
 
 Rules that inspect one chord and rules that inspect transitions may use distinct evaluation contexts if that keeps contracts small and explicit. A single highly generic rule framework is not required.
 
+Three-event rules use a distinct window context. Selected-path explanations preserve these scopes as event, adjacent transition, and three-event window data; one score contribution belongs to exactly one scope.
+
 ### 4.4 Application boundary
 
 Owns use-case orchestration:
@@ -179,7 +181,7 @@ Candidates are ordered by:
 2. stable musical tie-break fields, such as ordered MIDI-equivalent pitch values for Bass, Tenor, Alto, then Soprano;
 3. never collection iteration order, object identity, randomness, or thread timing.
 
-The exact scoring sign and tie-break fields must be finalized before implementation and recorded in `docs/MUSIC_RULES.md`.
+The exact scoring convention and tie-break fields are defined in `docs/MUSIC_RULES.md` and require Phase 0 review before implementation.
 
 ### 6.4 Outcomes
 
@@ -196,14 +198,19 @@ At minimum, successful output records:
 - engine version and rule-set version;
 - total score;
 - deterministic selection/tie-break identity;
-- per-event or per-transition rule identifier, category, outcome, and score contribution where relevant.
+- per-event, per-transition, or per-three-event-window rule identifier, category, outcome, and score contribution where relevant.
+
+The REST representation uses `evaluation.events`, `evaluation.transitions`, and `evaluation.windows` as defined normatively in `docs/API.md`. All three arrays are present even when empty, ordering is deterministic, and the total score equals the sum of every nonzero contribution across the three arrays without duplication.
 
 Verbose traces for rejected candidates are not required in normal API responses; they may become test diagnostics. This avoids exposing an unbounded search trace while retaining an auditable selected path.
 
 ## 8. Error strategy
 
 - Domain construction prevents invalid values where practical.
-- Multiple request validation errors may be returned together when deterministically discoverable.
+- Malformed JSON fails immediately. A raw body over 16384 bytes fails before JSON processing.
+- For structurally readable JSON, independently determinable field errors are collected. Structural/type/required/format/range validation precedes supported-subset/context validation; harmonization runs only after request validation succeeds completely.
+- Any structural/type/required/format/range error selects `400 INVALID_REQUEST`. Otherwise, any supported-subset/context error selects `422 UNSUPPORTED_MUSICAL_ELEMENT`. Dependent checks are skipped when their prerequisite cannot be parsed, so validation does not invent secondary errors.
+- Field errors use the deterministic ordering defined in `docs/API.md`.
 - Error codes are stable and machine-readable; messages are human-readable but are not contract identifiers.
 - No-solution is distinct from invalid input and internal failure.
 - API adapters map errors according to `docs/API.md`.
@@ -241,7 +248,7 @@ For a curated set or generated supported inputs, assert that every successful re
 
 ### 9.5 API contract tests
 
-When the REST adapter is authorized, verify serialization, validation errors, status codes, media types, version path, and examples in `docs/API.md`.
+When the REST adapter is authorized, verify serialization, validation errors and ordering, mixed-category precedence, status codes, media types, version path, the 16384-byte raw-body boundary, the 2-second protective processing timeout, explanation scopes and score reconciliation, and examples in `docs/API.md`.
 
 ### 9.6 End-to-end and regression tests
 
@@ -252,6 +259,7 @@ Maintain a small, music-theory-reviewed golden corpus. Golden results test deter
 The first MVP has no accounts and stores no arrangements. Even so:
 
 - enforce request size and numeric bounds;
+- enforce the 16384-byte raw-body limit before JSON processing and the 2-second harmonization ceiling without returning partial output;
 - reject unknown fields if contract strictness is adopted;
 - avoid logging full request bodies by default;
 - return correlation identifiers for internal errors;
@@ -269,7 +277,7 @@ The first MVP has no accounts and stores no arrangements. Even so:
 | A valid phrase has no solution under strict rules. | User receives no arrangement. | Return a specific no-solution outcome with relevant context; do not silently relax HARD rules. |
 | Explanation payload grows with search space. | Large responses and implementation coupling. | Explain the selected path by default; keep rejected-candidate traces diagnostic only. |
 | Exact musical output tests become brittle. | Safe scoring changes cause noisy failures. | Combine invariant tests with a small versioned golden corpus. |
-| API freezes before notation is approved. | Breaking contract changes. | Mark contract draft; finalize supported notation and limits before implementation. |
+| API freezes before notation is approved. | Breaking contract changes. | Keep the contract under Phase 0 review; implement only the finalized notation and limits in `API.md` and `MUSIC_RULES.md`. |
 
 ## 12. Architecture decision gates
 
@@ -291,4 +299,3 @@ Before application implementation begins, Phase 0 review must approve:
 - export formats;
 - advanced playback and score rendering;
 - microservices or multi-module decomposition.
-

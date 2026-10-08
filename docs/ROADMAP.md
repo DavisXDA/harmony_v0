@@ -1,5 +1,11 @@
 # Harmony Roadmap
 
+## Current authorization
+
+- M0 status: **APPROVED**.
+- Current authorized milestone: **M1 — Core music model and input validation**.
+- M2 and later milestones remain unauthorized until their respective gates are satisfied.
+
 ## 1. Roadmap principles
 
 - Complete and review Phase 0 before application implementation.
@@ -21,7 +27,7 @@
 | M6 | Minimal Flutter client submits input and displays SATB output | Mobile |
 | M7 | MVP verification and release-readiness review | QA + Tech Lead |
 
-Milestones M1–M7 are planned work, not authorization to start before M0 approval.
+M0 is approved. M1 is the current authorized milestone; M2–M7 remain planned work and are not yet authorized.
 
 ## 3. Milestones and acceptance criteria
 
@@ -115,11 +121,11 @@ Scope:
 Acceptance criteria:
 
 1. Valid documented requests return `200` and conform to `docs/API.md`.
-2. Invalid/unsupported requests return `400` or `422` with stable error codes as documented.
+2. Invalid/unsupported requests return `400` or `422` with stable error codes, precedence, aggregation, and ordering as documented.
 3. Valid requests with no solution return `422` with `NO_VALID_HARMONIZATION`.
-4. Contract tests cover examples, unknown/missing fields, status codes, and media type.
+4. Contract tests cover examples, unknown/missing fields, mixed validation errors, status codes, media type, the 16384-byte raw-body boundary, and the 2-second harmonization timeout.
 5. REST DTOs and Spring annotations do not enter the music domain.
-6. API responses expose engine and rule-set versions plus selected-path explanation.
+6. API responses expose engine and rule-set versions plus deterministic event, transition, and three-event-window selected-path explanations whose contributions reconcile to the total score.
 7. No persistence, account, cloud, or export code is added.
 
 ### M5 — Rhythmic MVP input

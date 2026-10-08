@@ -428,9 +428,28 @@ Do not sacrifice correctness for additional features.
 
 ## 15. Current Project Phase
 
-The project is currently in:
+CURRENT PHASE:
 
-PHASE 0 - PRODUCT AND ARCHITECTURE DEFINITION
+M1  CORE MUSIC MODEL AND INPUT VALIDATION
 
-Do not start application implementation until Phase 0 documentation
-has been completed and reviewed.
+Phase 0 has been approved.
+
+Authorized work:
+
+- minimal Maven/JUnit 5 Java project;
+- pure Java music domain;
+- input parsing and validation required by M1;
+- automated tests.
+
+Not yet authorized:
+
+- harmonization rule implementation beyond what M1 requires;
+- SATB search engine;
+- Spring Boot;
+- REST API;
+- Flutter;
+- persistence;
+- recognition;
+- exports.
+
+Do not silently begin M2.
