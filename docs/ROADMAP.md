@@ -1,5 +1,11 @@
 # Harmony Roadmap
 
+## Current authorization
+
+- M0 status: **APPROVED**.
+- Current authorized milestone: **M1 — Core music model and input validation**.
+- M2 and later milestones remain unauthorized until their respective gates are satisfied.
+
 ## 1. Roadmap principles
 
 - Complete and review Phase 0 before application implementation.
@@ -21,7 +27,7 @@
 | M6 | Minimal Flutter client submits input and displays SATB output | Mobile |
 | M7 | MVP verification and release-readiness review | QA + Tech Lead |
 
-Milestones M1–M7 are planned work, not authorization to start before M0 approval.
+M0 is approved. M1 is the current authorized milestone; M2–M7 remain planned work and are not yet authorized.
 
 ## 3. Milestones and acceptance criteria
 
